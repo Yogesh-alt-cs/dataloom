@@ -9,7 +9,7 @@ import {
 } from "@/lib/vault";
 
 export const Route = createFileRoute("/v/$id")({
-  validateSearch: (s: Record<string, unknown>) => ({ new: s.new === true || s.new === "true" }),
+  validateSearch: (s: Record<string, unknown>) => ({ new: s["new"] === true || s["new"] === "true" }),
   head: () => ({
     meta: [
       { title: "Your vault — DataLoom" },
@@ -102,7 +102,7 @@ function Dashboard({ s, items, setItems, lock }: { s: Session; items: Item[]; se
       if (f.size > MAX_FILE) { setMsg(`${f.name} is over 5 MB.`); continue; }
       add.push({ id: crypto.randomUUID(), kind: "file", name: f.name, mime: f.type, size: f.size, data: await fileToB64(f), updated: Date.now() });
     }
-    if (add.length) { commit([...add, ...items], 0); setSel(add[0].id); }
+    if (add.length) { commit([...add, ...items], 0); setSel(add[0]!.id); }
   }
   const remove = (id: string) => { if (confirm("Delete this item?")) { commit(items.filter((i) => i.id !== id), 0); setSel(null); } };
 
@@ -114,7 +114,7 @@ function Dashboard({ s, items, setItems, lock }: { s: Session; items: Item[]; se
           <span className="font-mono text-xs uppercase text-muted-foreground">
             {status === "saving" ? "Encrypting…" : status === "error" ? "Save failed" : "Encrypted · saved"}
           </span>
-          <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(location.href.split("?")[0])}>Copy address</Button>
+          <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(location.href.split("?")[0] ?? location.href)}>Copy address</Button>
           <Button size="sm" onClick={lock}>Lock</Button>
         </div>
       </header>
