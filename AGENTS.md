@@ -10,3 +10,4 @@
 <!-- LOVABLE:END -->
 
 - Accounts: browser derives (PBKDF2) an AES content key + a separate access token; server functions in src/lib/account.functions.ts store only ciphertext, salt and SHA-256 of the token in `accounts` (service-role only) and rate-limit via `rate_events`. Content key lives only in memory (src/lib/vault.ts). Why: server must never see readable content or the password.
+- DataLoom IDs are stored lowercased; the DB enforces this with a CHECK plus a unique index on lower(login_id). Why: case-insensitive uniqueness must hold even if app validation is bypassed.
