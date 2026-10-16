@@ -1,0 +1,2 @@
+ALTER TABLE public.accounts ADD CONSTRAINT accounts_login_id_lower CHECK (login_id = lower(login_id) AND login_id ~ '^[a-z0-9][a-z0-9_-]{2,31}$');
+CREATE UNIQUE INDEX accounts_login_id_ci ON public.accounts (lower(login_id));
