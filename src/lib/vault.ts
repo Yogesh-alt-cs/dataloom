@@ -1,4 +1,6 @@
 // Client-side encryption (AES-GCM, PBKDF2-derived key) + IndexedDB storage of ciphertext only.
+import { fetchVault, getVaultSalt, pushVault } from "./vault.functions";
+
 export type Item =
   | { id: string; kind: "note"; title: string; body: string; updated: number }
   | { id: string; kind: "file"; name: string; mime: string; size: number; data: string; updated: number };
@@ -31,7 +33,7 @@ async function put(id: string, v: unknown) {
     t.onerror = () => rej(t.error);
   });
 }
-async function get(id: string): Promise<{ salt: string; iv: string; ct: string } | undefined> {
+export async function getLocal(id: string): Promise<{ salt: string; iv: string; ct: string } | undefined> {
   const d = await db();
   return new Promise((res, rej) => {
     const r = d.transaction("vaults").objectStore("vaults").get(id);
@@ -41,35 +43,35 @@ async function get(id: string): Promise<{ salt: string; iv: string; ct: string }
 }
 
 async function derive(pw: string, salt: Uint8Array<ArrayBuffer>) {
-  const base = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveKey"]);
-  return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations: 310000, hash: "SHA-256" },
-    base,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"],
-  );
+  const base = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveBits"]);
+  // 512 bits: first half = AES key (never leaves the browser), second half = server access token.
+  const bits = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 310000, hash: "SHA-256" }, base, 512));
+  const key = await crypto.subtle.importKey("raw", bits.slice(0, 32), "AES-GCM", false, ["encrypt", "decrypt"]);
+  return { key, token: b64(bits.slice(32)) };
 }
 
-export type Session = { id: string; key: CryptoKey; salt: string };
+export type Session = { id: string; key: CryptoKey; token: string; salt: string };
 
 export const newVaultId = () => b64(crypto.getRandomValues(new Uint8Array(12))).replace(/[+/=]/g, (c) => ({ "+": "-", "/": "_", "=": "" })[c]!);
-export const vaultExists = async (id: string) => !!(await get(id));
+export const vaultExists = async (id: string) => !!(await getVaultSalt({ data: { id } })).salt;
 
 export async function createVault(id: string, pw: string): Promise<Session> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const s = { id, key: await derive(pw, salt), salt: b64(salt) };
+  const s = { id, ...(await derive(pw, salt)), salt: b64(salt) };
   await saveItems(s, []);
   return s;
 }
 
 export async function openVault(id: string, pw: string): Promise<{ s: Session; items: Item[] }> {
-  const rec = await get(id);
-  if (!rec) throw new Error("Vault not found on this device.");
-  const key = await derive(pw, unb64(rec.salt));
+  const { salt } = await getVaultSalt({ data: { id } });
+  if (!salt) throw new Error("No vault exists at this address.");
+  const d = await derive(pw, unb64(salt));
+  const rec = await fetchVault({ data: { id, token: d.token } });
   try {
-    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(rec.iv) }, key, unb64(rec.ct));
-    return { s: { id, key, salt: rec.salt }, items: JSON.parse(dec.decode(pt)) };
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(rec.iv) }, d.key, unb64(rec.ct));
+    const items: Item[] = JSON.parse(dec.decode(pt));
+    await put(id, { salt, iv: rec.iv, ct: rec.ct });
+    return { s: { id, ...d, salt }, items };
   } catch {
     throw new Error("Unable to unlock this vault.");
   }
@@ -78,7 +80,9 @@ export async function openVault(id: string, pw: string): Promise<{ s: Session; i
 export async function saveItems(s: Session, items: Item[]) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, s.key, enc.encode(JSON.stringify(items)));
-  await put(s.id, { salt: s.salt, iv: b64(iv), ct: b64(ct) });
+  const rec = { salt: s.salt, iv: b64(iv), ct: b64(ct) };
+  await put(s.id, rec); // local encrypted cache
+  await pushVault({ data: { id: s.id, token: s.token, ...rec } });
 }
 
 export const fileToB64 = async (f: File) => b64(await f.arrayBuffer());
