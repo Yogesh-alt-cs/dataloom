@@ -112,7 +112,7 @@ function Dashboard({ s, items, setItems, lock }: { s: Session; items: Item[]; se
         <Link to="/" className="flex items-center gap-2"><img src={mark} alt="" className="h-8 w-8 mix-blend-multiply" /><span className="font-display text-2xl">DataLoom</span></Link>
         <div className="flex items-center gap-3">
           <span className="font-mono text-xs uppercase text-muted-foreground">
-            {status === "saving" ? "Encrypting…" : status === "error" ? "Save failed" : "Encrypted · saved"}
+            {status === "saving" ? "Encrypting…" : status === "error" ? "Sync failed — retrying on next edit" : "Encrypted · synced"}
           </span>
           <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(location.href.split("?")[0] ?? location.href)}>Copy address</Button>
           <Button size="sm" onClick={lock}>Lock</Button>
