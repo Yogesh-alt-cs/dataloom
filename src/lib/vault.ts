@@ -12,7 +12,7 @@ const b64 = (b: ArrayBuffer | Uint8Array) => {
   for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
   return btoa(s);
 };
-const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)) as Uint8Array<ArrayBuffer>;
 
 function db(): Promise<IDBDatabase> {
   return new Promise((res, rej) => {
@@ -40,7 +40,7 @@ async function get(id: string): Promise<{ salt: string; iv: string; ct: string }
   });
 }
 
-async function derive(pw: string, salt: Uint8Array) {
+async function derive(pw: string, salt: Uint8Array<ArrayBuffer>) {
   const base = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(
     { name: "PBKDF2", salt, iterations: 310000, hash: "SHA-256" },
