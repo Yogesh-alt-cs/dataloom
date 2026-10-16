@@ -1,9 +1,6 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import logo from "@/assets/dataloom-logo.jpg";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { newVaultId } from "@/lib/vault";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -18,8 +15,6 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  const nav = useNavigate();
-  const [open, setOpen] = useState("");
   return (
     <main className="min-h-screen paper-grain">
       <div className="mx-auto max-w-5xl px-6 py-10">
@@ -37,26 +32,14 @@ function Home() {
               A quiet place for notes, images and PDFs. Everything is locked with your password before it's saved — we never see it.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" onClick={() => nav({ to: "/v/$id", params: { id: newVaultId() }, search: { new: true } })}>
-                Create your private vault
-              </Button>
+              <Button size="lg" asChild><Link to="/signup">Create your DataLoom ID</Link></Button>
+              <Button size="lg" variant="outline" asChild><Link to="/login">Log in</Link></Button>
             </div>
-            <form
-              className="mt-6 flex gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const id = open.trim().split("/v/").pop();
-                if (id) nav({ to: "/v/$id", params: { id }, search: { new: false } });
-              }}
-            >
-              <Input value={open} onChange={(e) => setOpen(e.target.value)} placeholder="Paste a vault address to open" />
-              <Button variant="outline" type="submit">Open</Button>
-            </form>
           </div>
         </section>
         <section className="grid gap-8 rule-ink pt-8 md:grid-cols-3">
           {[
-            ["01", "No account", "Just a private address and a password."],
+            ["01", "No account", "Just a unique ID and a password."],
             ["02", "Locked first", "Notes and files are encrypted before saving."],
             ["03", "5 MB per file", "Images and PDFs up to 5 MB each."],
           ].map(([n, t, d]) => (
