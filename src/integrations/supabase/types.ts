@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          auth_hash: string
+          created_at: string
+          ct: string
+          display_id: string
+          iv: string
+          login_id: string
+          salt: string
+          updated_at: string
+        }
+        Insert: {
+          auth_hash: string
+          created_at?: string
+          ct: string
+          display_id: string
+          iv: string
+          login_id: string
+          salt: string
+          updated_at?: string
+        }
+        Update: {
+          auth_hash?: string
+          created_at?: string
+          ct?: string
+          display_id?: string
+          iv?: string
+          login_id?: string
+          salt?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rate_events: {
+        Row: {
+          at: string
+          bucket: string
+          id: number
+        }
+        Insert: {
+          at?: string
+          bucket: string
+          id?: number
+        }
+        Update: {
+          at?: string
+          bucket?: string
+          id?: number
+        }
+        Relationships: []
+      }
       vaults: {
         Row: {
           auth_hash: string

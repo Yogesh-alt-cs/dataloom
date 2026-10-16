@@ -9,4 +9,4 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 
-- Vault sync: browser encrypts everything (AES-GCM, PBKDF2-derived); server functions in src/lib/vault.functions.ts store only ciphertext plus a hash of a password-derived access token in `vaults` (service-role only, no public policies). Why: server must never see readable content or the password.
+- Accounts: browser derives (PBKDF2) an AES content key + a separate access token; server functions in src/lib/account.functions.ts store only ciphertext, salt and SHA-256 of the token in `accounts` (service-role only) and rate-limit via `rate_events`. Content key lives only in memory (src/lib/vault.ts). Why: server must never see readable content or the password.

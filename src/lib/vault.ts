@@ -1,11 +1,14 @@
-// Client-side encryption (AES-GCM, PBKDF2-derived key) + IndexedDB storage of ciphertext only.
-import { fetchVault, getVaultSalt, pushVault } from "./vault.functions";
+// Client-side encryption (AES-GCM, PBKDF2-derived). Only ciphertext reaches the server.
+import { getLoginSalt, loginAccount, registerAccount, saveAccount } from "./account.functions";
 
 export type Item =
   | { id: string; kind: "note"; title: string; body: string; updated: number }
   | { id: string; kind: "file"; name: string; mime: string; size: number; data: string; updated: number };
 
 export const MAX_FILE = 5 * 1024 * 1024;
+export const ID_RE = /^[a-z0-9][a-z0-9_-]{2,31}$/;
+export const normalizeId = (s: string) => s.trim().toLowerCase();
+
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 const b64 = (b: ArrayBuffer | Uint8Array) => {
@@ -16,74 +19,49 @@ const b64 = (b: ArrayBuffer | Uint8Array) => {
 };
 const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)) as Uint8Array<ArrayBuffer>;
 
-function db(): Promise<IDBDatabase> {
-  return new Promise((res, rej) => {
-    const r = indexedDB.open("dataloom", 1);
-    r.onupgradeneeded = () => r.result.createObjectStore("vaults");
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
-  });
-}
-async function put(id: string, v: unknown) {
-  const d = await db();
-  await new Promise((res, rej) => {
-    const t = d.transaction("vaults", "readwrite");
-    t.objectStore("vaults").put(v, id);
-    t.oncomplete = res;
-    t.onerror = () => rej(t.error);
-  });
-}
-export async function getLocal(id: string): Promise<{ salt: string; iv: string; ct: string } | undefined> {
-  const d = await db();
-  return new Promise((res, rej) => {
-    const r = d.transaction("vaults").objectStore("vaults").get(id);
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
-  });
-}
-
 async function derive(pw: string, salt: Uint8Array<ArrayBuffer>) {
   const base = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveBits"]);
-  // 512 bits: first half = AES key (never leaves the browser), second half = server access token.
+  // 512 bits: first half = AES content key (stays in browser), second half = server access token.
   const bits = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 310000, hash: "SHA-256" }, base, 512));
   const key = await crypto.subtle.importKey("raw", bits.slice(0, 32), "AES-GCM", false, ["encrypt", "decrypt"]);
   return { key, token: b64(bits.slice(32)) };
 }
 
-export type Session = { id: string; key: CryptoKey; token: string; salt: string };
+export type Session = { id: string; display: string; key: CryptoKey; token: string };
 
-export const newVaultId = () => b64(crypto.getRandomValues(new Uint8Array(12))).replace(/[+/=]/g, (c) => ({ "+": "-", "/": "_", "=": "" })[c]!);
-export const vaultExists = async (id: string) => !!(await getVaultSalt({ data: { id } })).salt;
-
-export async function createVault(id: string, pw: string): Promise<Session> {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const s = { id, ...(await derive(pw, salt)), salt: b64(salt) };
-  await saveItems(s, []);
-  return s;
+async function seal(key: CryptoKey, items: Item[]) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(JSON.stringify(items)));
+  return { iv: b64(iv), ct: b64(ct) };
 }
 
-export async function openVault(id: string, pw: string): Promise<{ s: Session; items: Item[] }> {
-  const { salt } = await getVaultSalt({ data: { id } });
-  if (!salt) throw new Error("No vault exists at this address.");
+export async function register(display: string, pw: string): Promise<Session | { error: string }> {
+  const id = normalizeId(display);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const d = await derive(pw, salt);
+  const r = await registerAccount({ data: { id, display: display.trim(), token: d.token, salt: b64(salt), ...(await seal(d.key, [])) } });
+  if (!r.ok) return { error: r.error };
+  return { id, display: display.trim(), ...d };
+}
+
+export async function login(rawId: string, pw: string): Promise<{ s: Session; items: Item[] }> {
+  const id = normalizeId(rawId);
+  if (!ID_RE.test(id)) throw new Error("Incorrect ID or password.");
+  const { salt } = await getLoginSalt({ data: { id } });
   const d = await derive(pw, unb64(salt));
-  const rec = await fetchVault({ data: { id, token: d.token } });
-  try {
-    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(rec.iv) }, d.key, unb64(rec.ct));
-    const items: Item[] = JSON.parse(dec.decode(pt));
-    await put(id, { salt, iv: rec.iv, ct: rec.ct });
-    return { s: { id, ...d, salt }, items };
-  } catch {
-    throw new Error("Unable to unlock this vault.");
-  }
+  const rec = await loginAccount({ data: { id, token: d.token } });
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(rec.iv) }, d.key, unb64(rec.ct));
+  return { s: { id, display: rec.display, ...d }, items: JSON.parse(dec.decode(pt)) };
 }
 
 export async function saveItems(s: Session, items: Item[]) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, s.key, enc.encode(JSON.stringify(items)));
-  const rec = { salt: s.salt, iv: b64(iv), ct: b64(ct) };
-  await put(s.id, rec); // local encrypted cache
-  await pushVault({ data: { id: s.id, token: s.token, ...rec } });
+  await saveAccount({ data: { id: s.id, token: s.token, ...(await seal(s.key, items)) } });
 }
+
+// In-memory session only: the content key is never persisted to storage.
+let current: { s: Session; items: Item[] } | null = null;
+export const setSession = (v: typeof current) => { current = v; };
+export const getSession = () => current;
 
 export const fileToB64 = async (f: File) => b64(await f.arrayBuffer());
 export const b64ToBlob = (d: string, mime: string) => new Blob([unb64(d)], { type: mime });

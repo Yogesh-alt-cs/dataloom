@@ -8,6 +8,13 @@
       "when": 1792140273788,
       "tag": "0000_create_vaults",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792140982701,
+      "tag": "0001_accounts_and_attempts",
+      "breakpoints": true
     }
   ]
 }
