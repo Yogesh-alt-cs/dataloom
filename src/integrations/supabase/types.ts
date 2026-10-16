@@ -97,7 +97,47 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      dl_hash: { Args: { _token: string }; Returns: string }
+      dl_login: {
+        Args: { _id: string; _ip: string; _token: string }
+        Returns: {
+          ct: string
+          display: string
+          iv: string
+        }[]
+      }
+      dl_rate: {
+        Args: { _bucket: string; _max: number; _minutes: number }
+        Returns: undefined
+      }
+      dl_register: {
+        Args: {
+          _ct: string
+          _display: string
+          _id: string
+          _ip: string
+          _iv: string
+          _salt: string
+          _token: string
+        }
+        Returns: string
+      }
+      dl_salt: { Args: { _id: string; _ip: string }; Returns: string }
+      dl_save: {
+        Args: { _ct: string; _id: string; _iv: string; _token: string }
+        Returns: boolean
+      }
+      dl_taken_ids: { Args: { _ids: string[]; _ip: string }; Returns: string[] }
+      dl_verify: {
+        Args: {
+          _bucket: string
+          _id: string
+          _max: number
+          _minutes: number
+          _token: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

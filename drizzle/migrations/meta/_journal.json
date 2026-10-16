@@ -22,6 +22,13 @@
       "when": 1792144590194,
       "tag": "0002_accounts_lowercase_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792144973490,
+      "tag": "0003_account_rpc_functions",
+      "breakpoints": true
     }
   ]
 }
