@@ -48,10 +48,12 @@ function Signup() {
     e.preventDefault();
     if (busy) return;
     setErr("");
-    if (avail.state !== "ok") return setErr("Please choose an available ID.");
+    if (avail.state === "invalid" || avail.state === "idle") return setErr("Please choose a valid ID.");
+    if (avail.state === "taken") return setErr("This ID is already taken by another user. Please choose a different ID.");
     if (pw.length < 10) return setErr("Password must be at least 10 characters.");
     if (pw !== pw2) return setErr("Passwords don't match.");
     if (!ack) return setErr("Please confirm you understand there is no password reset.");
+    // The server enforces uniqueness on insert, so a pending/failed live check need not block submission.
     setBusy(true);
     try {
       const r = await register(id, pw);
