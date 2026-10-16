@@ -15,6 +15,13 @@
       "when": 1792140982701,
       "tag": "0001_accounts_and_attempts",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792144590194,
+      "tag": "0002_accounts_lowercase_unique",
+      "breakpoints": true
     }
   ]
 }
