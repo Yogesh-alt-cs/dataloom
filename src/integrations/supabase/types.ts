@@ -14,7 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      vaults: {
+        Row: {
+          auth_hash: string
+          ct: string
+          id: string
+          iv: string
+          salt: string
+          updated_at: string
+        }
+        Insert: {
+          auth_hash: string
+          ct: string
+          id: string
+          iv: string
+          salt: string
+          updated_at?: string
+        }
+        Update: {
+          auth_hash?: string
+          ct?: string
+          id?: string
+          iv?: string
+          salt?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
